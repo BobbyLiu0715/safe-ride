@@ -6,7 +6,6 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="平安出行">
-<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%231a1a2e' width='100' height='100' rx='20'/><text y='70' x='50' text-anchor='middle' font-size='60'>🚗</text></svg>">
 <meta name="theme-color" content="#1a1a2e">
 <title>平安出行</title>
 <style>
@@ -24,6 +23,58 @@ body {
   user-select: none;
   -webkit-user-select: none;
 }
+
+/* Splash screen */
+.splash {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: #1a1a2e;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  z-index: 100;
+  transition: opacity 0.8s ease, transform 0.8s ease;
+}
+.splash.hide {
+  opacity: 0;
+  transform: translateY(-30px);
+  pointer-events: none;
+}
+.splash-emoji {
+  font-size: 80px;
+  animation: bounce 1s ease infinite;
+  margin-bottom: 30px;
+}
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-15px); }
+}
+.splash-text {
+  font-size: 22px;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.8;
+  color: #e6edf3;
+  max-width: 300px;
+}
+.splash-sub {
+  font-size: 15px;
+  color: #8b949e;
+  margin-top: 16px;
+  text-align: center;
+  line-height: 1.6;
+}
+.splash-heart {
+  color: #f85149;
+  animation: heartbeat 1.2s ease infinite;
+  display: inline-block;
+}
+@keyframes heartbeat {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+}
+
+/* Main UI */
+.main-ui { display: none; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 100%; }
+.main-ui.show { display: flex; }
 .status { font-size: 18px; color: #8b949e; margin-bottom: 40px; text-align: center; line-height: 1.6; }
 .status .time { color: #58a6ff; font-size: 14px; margin-top: 8px; }
 .btn-container { position: relative; }
@@ -80,44 +131,65 @@ body {
 .feedback.error { color: #f85149; }
 .history { margin-top: 30px; font-size: 13px; color: #8b949e; text-align: center; }
 .history-item { margin: 6px 0; }
-.board-icon::before { content: '🚗'; }
-.alight-icon::before { content: '📍'; }
+.location-status { margin-top: 16px; font-size: 12px; color: #8b949e; }
+.location-status .active { color: #3fb950; }
 </style>
 </head>
 <body>
 
-<div class="status" id="statusText">
-  长按按钮 3 秒记录
-  <div class="time" id="lastAction"></div>
+<!-- Splash Screen -->
+<div class="splash" id="splash">
+  <div class="splash-emoji">🚗</div>
+  <div class="splash-text">
+    老婆要上车了嘛？<br>
+    开车小心哦！<span class="splash-heart">❤️</span>
+  </div>
+  <div class="splash-sub">
+    到了别忘再来这个app<br>告诉我一下！
+  </div>
 </div>
 
-<div class="btn-container">
-  <svg class="progress-ring" viewBox="0 0 220 220">
-    <circle class="progress-bg" cx="110" cy="110" r="105"/>
-    <circle class="progress-fill" id="progressCircle" cx="110" cy="110" r="105"/>
-  </svg>
-  <button class="btn btn-board" id="mainBtn">
-    <span class="icon" id="btnIcon">🚗</span>
-    <span id="btnText">上车</span>
-    <span class="sub" id="btnSub">长按 3 秒</span>
-  </button>
+<!-- Main UI -->
+<div class="main-ui" id="mainUI">
+  <div class="status" id="statusText">
+    长按按钮 3 秒记录
+    <div class="time" id="lastAction"></div>
+  </div>
+
+  <div class="btn-container">
+    <svg class="progress-ring" viewBox="0 0 220 220">
+      <circle class="progress-bg" cx="110" cy="110" r="105"/>
+      <circle class="progress-fill" id="progressCircle" cx="110" cy="110" r="105"/>
+    </svg>
+    <button class="btn btn-board" id="mainBtn">
+      <span class="icon" id="btnIcon">🚗</span>
+      <span id="btnText">上车</span>
+      <span class="sub" id="btnSub">长按 3 秒</span>
+    </button>
+  </div>
+
+  <div class="feedback" id="feedback"></div>
+
+  <div class="location-status" id="locStatus"></div>
+
+  <div class="history" id="history"></div>
 </div>
-
-<div class="feedback" id="feedback"></div>
-
-<div class="history" id="history"></div>
 
 <script>
-// Config - Bobby's Telegram notification
+// Config
 const BOT_TOKEN = '8041612253:AAG9PpcPThEbu1mXOLCKQy3IYJAYqMzxtmM';
 const BOBBY_CHAT_ID = '8587823969';
-const HOLD_DURATION = 3000; // 3 seconds
-const CIRCLE_LENGTH = 2 * Math.PI * 105; // ~660
+const HOLD_DURATION = 3000;
+const CIRCLE_LENGTH = 2 * Math.PI * 105;
+const LOCATION_INTERVAL = 30000; // send location every 30s while onboard
 
 let state = localStorage.getItem('rideState') || 'idle'; // idle | onboard
 let holdStart = null;
 let holdTimer = null;
 let progressTimer = null;
+let locationWatchId = null;
+let locationSendTimer = null;
+let lastLocation = null;
 
 const btn = document.getElementById('mainBtn');
 const btnText = document.getElementById('btnText');
@@ -125,21 +197,97 @@ const btnIcon = document.getElementById('btnIcon');
 const btnSub = document.getElementById('btnSub');
 const feedback = document.getElementById('feedback');
 const progressCircle = document.getElementById('progressCircle');
-const statusText = document.getElementById('statusText');
-const lastAction = document.getElementById('lastAction');
+const lastActionEl = document.getElementById('lastAction');
 const historyEl = document.getElementById('history');
+const locStatus = document.getElementById('locStatus');
 
+// === Splash Screen ===
+function showSplash() {
+  const splash = document.getElementById('splash');
+  const mainUI = document.getElementById('mainUI');
+  // Show splash for 3 seconds
+  setTimeout(() => {
+    splash.classList.add('hide');
+    setTimeout(() => {
+      splash.style.display = 'none';
+      mainUI.classList.add('show');
+    }, 800);
+  }, 3000);
+}
+
+// === Location Tracking ===
+function startLocationTracking() {
+  if (!navigator.geolocation) {
+    locStatus.innerHTML = '📍 设备不支持定位';
+    return;
+  }
+  locStatus.innerHTML = '📍 <span class="active">定位追踪中...</span>';
+
+  locationWatchId = navigator.geolocation.watchPosition(
+    (pos) => {
+      lastLocation = {
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        accuracy: pos.coords.accuracy,
+        speed: pos.coords.speed,
+        ts: Date.now()
+      };
+      locStatus.innerHTML = `📍 <span class="active">定位中</span> (精度 ${Math.round(lastLocation.accuracy)}m)`;
+    },
+    (err) => {
+      locStatus.innerHTML = `📍 定位失败: ${err.message}`;
+    },
+    { enableHighAccuracy: true, maximumAge: 10000 }
+  );
+
+  // Send location periodically
+  locationSendTimer = setInterval(sendLocation, LOCATION_INTERVAL);
+}
+
+function stopLocationTracking() {
+  if (locationWatchId !== null) {
+    navigator.geolocation.clearWatch(locationWatchId);
+    locationWatchId = null;
+  }
+  if (locationSendTimer) {
+    clearInterval(locationSendTimer);
+    locationSendTimer = null;
+  }
+  locStatus.innerHTML = '';
+  lastLocation = null;
+}
+
+async function sendLocation() {
+  if (!lastLocation) return;
+  try {
+    const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendLocation`;
+    await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: BOBBY_CHAT_ID,
+        latitude: lastLocation.lat,
+        longitude: lastLocation.lng,
+        disable_notification: true
+      })
+    });
+  } catch(e) {}
+}
+
+// === UI ===
 function updateUI() {
   if (state === 'idle') {
     btn.className = 'btn btn-board';
     btnIcon.textContent = '🚗';
     btnText.textContent = '上车';
     btnSub.textContent = '长按 3 秒';
+    stopLocationTracking();
   } else {
     btn.className = 'btn btn-alight';
     btnIcon.textContent = '📍';
-    btnText.textContent = '下车';
+    btnText.textContent = '到了';
     btnSub.textContent = '长按 3 秒';
+    startLocationTracking();
   }
   loadHistory();
 }
@@ -181,16 +329,53 @@ async function triggerAction() {
   const fullTime = now.toLocaleString('zh-CN');
 
   let message, emoji, actionLabel;
+
   if (state === 'idle') {
+    // Board
     state = 'onboard';
     actionLabel = '上车';
     emoji = '🚗';
     message = `🚗 老婆上车了\n🕐 ${fullTime}`;
+
+    // Try to get current location for departure
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition((pos) => {
+        const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendLocation`;
+        fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: BOBBY_CHAT_ID,
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            disable_notification: true
+          })
+        }).catch(() => {});
+      }, () => {}, { enableHighAccuracy: true });
+    }
   } else {
+    // Alight
     state = 'idle';
-    actionLabel = '下车';
+    actionLabel = '到达';
     emoji = '📍';
-    message = `📍 老婆已平安到达\n🕐 ${fullTime}`;
+    message = `📍 老婆已平安到达！\n🕐 ${fullTime}`;
+
+    // Send final location
+    if (lastLocation) {
+      try {
+        const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendLocation`;
+        await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: BOBBY_CHAT_ID,
+            latitude: lastLocation.lat,
+            longitude: lastLocation.lng,
+            disable_notification: true
+          })
+        });
+      } catch(e) {}
+    }
   }
 
   localStorage.setItem('rideState', state);
@@ -202,9 +387,9 @@ async function triggerAction() {
   localStorage.setItem('rideHistory', JSON.stringify(history));
 
   // Vibrate
-  if (navigator.vibrate) navigator.vibrate(200);
+  if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
 
-  // Send to Bobby via Telegram
+  // Send message to Bobby
   try {
     const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
     const resp = await fetch(url, {
@@ -223,39 +408,45 @@ async function triggerAction() {
     feedback.className = 'feedback error';
   }
 
-  lastAction.textContent = `上次: ${actionLabel} ${timeStr}`;
+  lastActionEl.textContent = `上次: ${actionLabel} ${timeStr}`;
   updateUI();
 }
 
 function loadHistory() {
   const history = JSON.parse(localStorage.getItem('rideHistory') || '[]');
-  if (history.length === 0) {
-    historyEl.innerHTML = '';
-    return;
-  }
+  if (history.length === 0) { historyEl.innerHTML = ''; return; }
   const items = history.slice(0, 5).map(h =>
     `<div class="history-item">${h.emoji} ${h.action} · ${h.time}</div>`
   ).join('');
   historyEl.innerHTML = `<div style="margin-bottom:6px">最近记录</div>${items}`;
 }
 
-// Touch events
+// === Events ===
 btn.addEventListener('touchstart', (e) => { e.preventDefault(); startHold(); });
 btn.addEventListener('touchend', cancelHold);
 btn.addEventListener('touchcancel', cancelHold);
-// Mouse fallback
 btn.addEventListener('mousedown', startHold);
 btn.addEventListener('mouseup', cancelHold);
 btn.addEventListener('mouseleave', cancelHold);
 
-// Restore last action
+// Restore state
 const lastHist = JSON.parse(localStorage.getItem('rideHistory') || '[]');
 if (lastHist.length > 0) {
-  lastAction.textContent = `上次: ${lastHist[0].action} ${lastHist[0].time}`;
+  lastActionEl.textContent = `上次: ${lastHist[0].action} ${lastHist[0].time}`;
 }
 
-resetProgress();
-updateUI();
+// If was onboard, resume tracking
+if (state === 'onboard') {
+  // Skip splash, go straight to main UI
+  document.getElementById('splash').style.display = 'none';
+  document.getElementById('mainUI').classList.add('show');
+  updateUI();
+} else {
+  showSplash();
+  resetProgress();
+  // updateUI after splash
+  setTimeout(() => updateUI(), 3800);
+}
 </script>
 </body>
 </html>
