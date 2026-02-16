@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="平安出行">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%231a1a2e' width='100' height='100' rx='20'/><text y='70' x='50' text-anchor='middle' font-size='60'>🚗</text></svg>">
+<meta name="theme-color" content="#1a1a2e">
+<title>平安出行</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; overflow: hidden; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif;
+  background: #1a1a2e;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.status { font-size: 18px; color: #8b949e; margin-bottom: 40px; text-align: center; line-height: 1.6; }
+.status .time { color: #58a6ff; font-size: 14px; margin-top: 8px; }
+.btn-container { position: relative; }
+.btn {
+  width: 200px; height: 200px;
+  border-radius: 50%;
+  border: none;
+  font-size: 22px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  transition: all 0.3s;
+  position: relative;
+  z-index: 2;
+}
+.btn-board {
+  background: linear-gradient(135deg, #3fb950, #2ea043);
+  color: #fff;
+  box-shadow: 0 8px 30px rgba(63, 185, 80, 0.4);
+}
+.btn-alight {
+  background: linear-gradient(135deg, #f85149, #da3633);
+  color: #fff;
+  box-shadow: 0 8px 30px rgba(248, 81, 73, 0.4);
+}
+.btn:active { transform: scale(0.95); }
+.btn .icon { font-size: 48px; margin-bottom: 8px; }
+.btn .sub { font-size: 13px; font-weight: 400; opacity: 0.8; margin-top: 4px; }
+.progress-ring {
+  position: absolute;
+  top: -10px; left: -10px;
+  width: 220px; height: 220px;
+  z-index: 1;
+}
+.progress-ring circle {
+  fill: none;
+  stroke-width: 4;
+  stroke-linecap: round;
+  transform: rotate(-90deg);
+  transform-origin: center;
+}
+.progress-bg { stroke: rgba(255,255,255,0.1); }
+.progress-fill { stroke: #fff; stroke-dasharray: 660; stroke-dashoffset: 660; transition: stroke-dashoffset 0.1s linear; }
+.feedback {
+  margin-top: 40px;
+  font-size: 16px;
+  min-height: 24px;
+  text-align: center;
+}
+.feedback.success { color: #3fb950; }
+.feedback.error { color: #f85149; }
+.history { margin-top: 30px; font-size: 13px; color: #8b949e; text-align: center; }
+.history-item { margin: 6px 0; }
+.board-icon::before { content: '🚗'; }
+.alight-icon::before { content: '📍'; }
+</style>
+</head>
+<body>
+
+<div class="status" id="statusText">
+  长按按钮 3 秒记录
+  <div class="time" id="lastAction"></div>
+</div>
+
+<div class="btn-container">
+  <svg class="progress-ring" viewBox="0 0 220 220">
+    <circle class="progress-bg" cx="110" cy="110" r="105"/>
+    <circle class="progress-fill" id="progressCircle" cx="110" cy="110" r="105"/>
+  </svg>
+  <button class="btn btn-board" id="mainBtn">
+    <span class="icon" id="btnIcon">🚗</span>
+    <span id="btnText">上车</span>
+    <span class="sub" id="btnSub">长按 3 秒</span>
+  </button>
+</div>
+
+<div class="feedback" id="feedback"></div>
+
+<div class="history" id="history"></div>
+
+<script>
+// Config - Bobby's Telegram notification
+const BOT_TOKEN = '8041612253:AAG9PpcPThEbu1mXOLCKQy3IYJAYqMzxtmM';
+const BOBBY_CHAT_ID = '8587823969';
+const HOLD_DURATION = 3000; // 3 seconds
+const CIRCLE_LENGTH = 2 * Math.PI * 105; // ~660
+
+let state = localStorage.getItem('rideState') || 'idle'; // idle | onboard
+let holdStart = null;
+let holdTimer = null;
+let progressTimer = null;
+
+const btn = document.getElementById('mainBtn');
+const btnText = document.getElementById('btnText');
+const btnIcon = document.getElementById('btnIcon');
+const btnSub = document.getElementById('btnSub');
+const feedback = document.getElementById('feedback');
+const progressCircle = document.getElementById('progressCircle');
+const statusText = document.getElementById('statusText');
+const lastAction = document.getElementById('lastAction');
+const historyEl = document.getElementById('history');
+
+function updateUI() {
+  if (state === 'idle') {
+    btn.className = 'btn btn-board';
+    btnIcon.textContent = '🚗';
+    btnText.textContent = '上车';
+    btnSub.textContent = '长按 3 秒';
+  } else {
+    btn.className = 'btn btn-alight';
+    btnIcon.textContent = '📍';
+    btnText.textContent = '下车';
+    btnSub.textContent = '长按 3 秒';
+  }
+  loadHistory();
+}
+
+function resetProgress() {
+  progressCircle.style.strokeDashoffset = CIRCLE_LENGTH;
+}
+
+function startHold() {
+  holdStart = Date.now();
+  feedback.textContent = '';
+  feedback.className = 'feedback';
+
+  progressTimer = setInterval(() => {
+    const elapsed = Date.now() - holdStart;
+    const pct = Math.min(elapsed / HOLD_DURATION, 1);
+    progressCircle.style.strokeDashoffset = CIRCLE_LENGTH * (1 - pct);
+  }, 30);
+
+  holdTimer = setTimeout(() => {
+    clearInterval(progressTimer);
+    progressCircle.style.strokeDashoffset = 0;
+    triggerAction();
+  }, HOLD_DURATION);
+}
+
+function cancelHold() {
+  if (holdTimer) clearTimeout(holdTimer);
+  if (progressTimer) clearInterval(progressTimer);
+  holdTimer = null;
+  progressTimer = null;
+  holdStart = null;
+  resetProgress();
+}
+
+async function triggerAction() {
+  const now = new Date();
+  const timeStr = now.toLocaleString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+  const fullTime = now.toLocaleString('zh-CN');
+
+  let message, emoji, actionLabel;
+  if (state === 'idle') {
+    state = 'onboard';
+    actionLabel = '上车';
+    emoji = '🚗';
+    message = `🚗 老婆上车了\n🕐 ${fullTime}`;
+  } else {
+    state = 'idle';
+    actionLabel = '下车';
+    emoji = '📍';
+    message = `📍 老婆已平安到达\n🕐 ${fullTime}`;
+  }
+
+  localStorage.setItem('rideState', state);
+
+  // Save to history
+  const history = JSON.parse(localStorage.getItem('rideHistory') || '[]');
+  history.unshift({ action: actionLabel, time: fullTime, emoji });
+  if (history.length > 20) history.pop();
+  localStorage.setItem('rideHistory', JSON.stringify(history));
+
+  // Vibrate
+  if (navigator.vibrate) navigator.vibrate(200);
+
+  // Send to Bobby via Telegram
+  try {
+    const url = `https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`;
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: BOBBY_CHAT_ID, text: message })
+    });
+    if (resp.ok) {
+      feedback.textContent = `✓ 已通知 Bobby`;
+      feedback.className = 'feedback success';
+    } else {
+      throw new Error('send failed');
+    }
+  } catch(e) {
+    feedback.textContent = `通知发送失败，请检查网络`;
+    feedback.className = 'feedback error';
+  }
+
+  lastAction.textContent = `上次: ${actionLabel} ${timeStr}`;
+  updateUI();
+}
+
+function loadHistory() {
+  const history = JSON.parse(localStorage.getItem('rideHistory') || '[]');
+  if (history.length === 0) {
+    historyEl.innerHTML = '';
+    return;
+  }
+  const items = history.slice(0, 5).map(h =>
+    `<div class="history-item">${h.emoji} ${h.action} · ${h.time}</div>`
+  ).join('');
+  historyEl.innerHTML = `<div style="margin-bottom:6px">最近记录</div>${items}`;
+}
+
+// Touch events
+btn.addEventListener('touchstart', (e) => { e.preventDefault(); startHold(); });
+btn.addEventListener('touchend', cancelHold);
+btn.addEventListener('touchcancel', cancelHold);
+// Mouse fallback
+btn.addEventListener('mousedown', startHold);
+btn.addEventListener('mouseup', cancelHold);
+btn.addEventListener('mouseleave', cancelHold);
+
+// Restore last action
+const lastHist = JSON.parse(localStorage.getItem('rideHistory') || '[]');
+if (lastHist.length > 0) {
+  lastAction.textContent = `上次: ${lastHist[0].action} ${lastHist[0].time}`;
+}
+
+resetProgress();
+updateUI();
+</script>
+</body>
+</html>
