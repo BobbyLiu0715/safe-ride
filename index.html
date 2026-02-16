@@ -105,6 +105,8 @@ body {
 }
 .btn:active { transform: scale(0.95); }
 .btn .icon { font-size: 48px; margin-bottom: 8px; }
+.btn .icon img { width: 80px; height: 48px; }
+.splash-emoji img { width: 120px; height: 72px; }
 .btn .sub { font-size: 13px; font-weight: 400; opacity: 0.8; margin-top: 4px; }
 .progress-ring {
   position: absolute;
@@ -139,7 +141,7 @@ body {
 
 <!-- Splash Screen -->
 <div class="splash" id="splash">
-  <div class="splash-emoji">🚗</div>
+  <div class="splash-emoji"><img src="mazda-suv.svg" alt="car"></div>
   <div class="splash-text">
     老婆要上车了嘛？<br>
     开车小心哦！<span class="splash-heart">❤️</span>
@@ -278,13 +280,13 @@ async function sendLocation() {
 function updateUI() {
   if (state === 'idle') {
     btn.className = 'btn btn-board';
-    btnIcon.textContent = '🚗';
+    btnIcon.innerHTML = '<img src="mazda-suv.svg" alt="car">';
     btnText.textContent = '上车';
     btnSub.textContent = '长按 3 秒';
     stopLocationTracking();
   } else {
     btn.className = 'btn btn-alight';
-    btnIcon.textContent = '📍';
+    btnIcon.innerHTML = '📍';
     btnText.textContent = '到了';
     btnSub.textContent = '长按 3 秒';
     startLocationTracking();

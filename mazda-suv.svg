@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 120" fill="none">
+  <!-- Body -->
+  <path d="M30 75 Q30 55 50 50 L75 35 Q90 25 110 25 L145 25 Q160 25 170 40 L180 55 Q190 60 190 75 L190 80 L30 80 Z" fill="white" opacity="0.95"/>
+  <!-- Windows -->
+  <path d="M78 38 L65 55 L105 55 L105 30 Q95 28 85 30 Z" fill="#1a1a2e" opacity="0.7"/>
+  <path d="M110 28 L110 55 L160 55 L155 38 Q150 28 140 28 Z" fill="#1a1a2e" opacity="0.7"/>
+  <!-- Window divider -->
+  <line x1="107" y1="28" x2="107" y2="55" stroke="white" stroke-width="2.5"/>
+  <!-- Roof line -->
+  <path d="M75 35 Q90 23 110 23 L145 23 Q155 23 165 33" stroke="white" stroke-width="1" fill="none" opacity="0.5"/>
+  <!-- Wheel wells -->
+  <path d="M55 80 Q55 62 73 62 Q91 62 91 80" fill="#1a1a2e"/>
+  <path d="M130 80 Q130 62 148 62 Q166 62 166 80" fill="#1a1a2e"/>
+  <!-- Wheels -->
+  <circle cx="73" cy="80" r="15" fill="#333" stroke="#888" stroke-width="2"/>
+  <circle cx="73" cy="80" r="8" fill="#555" stroke="#999" stroke-width="1"/>
+  <circle cx="73" cy="80" r="3" fill="#888"/>
+  <circle cx="148" cy="80" r="15" fill="#333" stroke="#888" stroke-width="2"/>
+  <circle cx="148" cy="80" r="8" fill="#555" stroke="#999" stroke-width="1"/>
+  <circle cx="148" cy="80" r="3" fill="#888"/>
+  <!-- Headlights -->
+  <path d="M185 60 Q192 63 192 70 L188 72 Q186 65 185 60 Z" fill="#FFE066" opacity="0.9"/>
+  <!-- Taillights -->
+  <path d="M30 65 Q28 68 28 73 L32 75 Q32 70 30 65 Z" fill="#f85149" opacity="0.8"/>
+  <!-- Mazda grille -->
+  <rect x="183" y="62" width="6" height="12" rx="2" fill="white" opacity="0.3"/>
+  <!-- Side line -->
+  <line x1="40" y1="65" x2="180" y2="65" stroke="white" stroke-width="0.8" opacity="0.3"/>
+  <!-- Door handle -->
+  <rect x="120" y="50" width="12" height="3" rx="1.5" fill="white" opacity="0.4"/>
+  <!-- Roof rails -->
+  <line x1="80" y1="23" x2="145" y2="23" stroke="white" stroke-width="2" stroke-linecap="round" opacity="0.4"/>
+</svg>
