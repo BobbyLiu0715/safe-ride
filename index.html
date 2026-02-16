@@ -183,7 +183,7 @@ const BOT_TOKEN = '8041612253:AAG9PpcPThEbu1mXOLCKQy3IYJAYqMzxtmM';
 const BOBBY_CHAT_ID = '8587823969';
 const HOLD_DURATION = 3000;
 const CIRCLE_LENGTH = 2 * Math.PI * 105;
-const LOCATION_INTERVAL = 30000; // send location every 30s while onboard
+// Location is tracked locally but only sent on board/alight or when Bobby requests
 
 let state = localStorage.getItem('rideState') || 'idle'; // idle | onboard
 let holdStart = null;
@@ -242,8 +242,7 @@ function startLocationTracking() {
     { enableHighAccuracy: true, maximumAge: 10000 }
   );
 
-  // Send location periodically
-  locationSendTimer = setInterval(sendLocation, LOCATION_INTERVAL);
+  // Location is tracked locally, not sent automatically
 }
 
 function stopLocationTracking() {
